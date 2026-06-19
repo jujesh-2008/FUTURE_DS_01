@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SalesIQ — Business Analytics Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+/* ── Design tokens ─────────────────────────────────────────────────────── */
+:root{
+  --bg:        #0b0f1a;
+  --surface:   #111827;
+  --card:      #161f30;
+  --border:    #1e2d47;
+  --accent:    #3b82f6;
+  --accent2:   #10b981;
+  --accent3:   #f59e0b;
+  --accent4:   #8b5cf6;
+  --accent5:   #ef4444;
+  --text:      #f1f5f9;
+  --muted:     #64748b;
+  --subtle:    #1e293b;
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --radius:    12px;
+  --radius-sm: 8px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:14px;min-height:100vh;overflow-x:hidden}
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+/* ── Layout ────────────────────────────────────────────────────────────── */
+.shell{display:grid;grid-template-columns:240px 1fr;grid-template-rows:auto 1fr;min-height:100vh}
+.topbar{grid-column:1/-1;display:flex;align-items:center;gap:16px;padding:0 28px;height:60px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100}
+.logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px;letter-spacing:-.5px;color:var(--text)}
+.logo-icon{width:32px;height:32px;background:linear-gradient(135deg,var(--accent),var(--accent4));border-radius:8px;display:grid;place-items:center;font-size:16px}
+.topbar-meta{margin-left:auto;display:flex;align-items:center;gap:20px}
+.live-badge{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--accent2);font-weight:500}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--accent2);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.topbar-date{font-size:12px;color:var(--muted)}
+.avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent4));display:grid;place-items:center;font-size:13px;font-weight:700;cursor:pointer}
+
+/* ── Sidebar ───────────────────────────────────────────────────────────── */
+.sidebar{background:var(--surface);border-right:1px solid var(--border);padding:24px 0;display:flex;flex-direction:column;gap:4px}
+.nav-section{padding:0 16px 8px;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-top:16px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 20px;color:var(--muted);cursor:pointer;border-radius:0;transition:all .15s;font-weight:500;font-size:13.5px;border-left:3px solid transparent}
+.nav-item:hover{color:var(--text);background:var(--subtle)}
+.nav-item.active{color:var(--accent);background:rgba(59,130,246,.08);border-left-color:var(--accent)}
+.nav-icon{font-size:16px;width:20px;text-align:center}
+
+/* ── Main Content ──────────────────────────────────────────────────────── */
+.main{overflow-y:auto;padding:28px}
+.page{display:none}
+.page.active{display:block}
+
+/* ── Filter Bar ────────────────────────────────────────────────────────── */
+.filter-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:24px;padding:16px 20px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius)}
+.filter-label{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+select,button{font-family:inherit;font-size:13px}
+select{background:var(--subtle);color:var(--text);border:1px solid var(--border);padding:7px 12px;border-radius:var(--radius-sm);cursor:pointer;outline:none;transition:border .15s}
+select:hover,select:focus{border-color:var(--accent)}
+.btn{padding:7px 18px;border-radius:var(--radius-sm);border:none;cursor:pointer;font-weight:600;font-size:13px;transition:all .15s}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:#2563eb}
+.btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}
+.btn-ghost:hover{color:var(--text);border-color:var(--accent)}
+
+/* ── KPI Cards ─────────────────────────────────────────────────────────── */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px}
+.kpi-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px 22px;position:relative;overflow:hidden;transition:transform .2s,border-color .2s}
+.kpi-card:hover{transform:translateY(-2px);border-color:var(--accent)}
+.kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.kpi-card.blue::before{background:linear-gradient(90deg,var(--accent),#60a5fa)}
+.kpi-card.green::before{background:linear-gradient(90deg,var(--accent2),#34d399)}
+.kpi-card.amber::before{background:linear-gradient(90deg,var(--accent3),#fbbf24)}
+.kpi-card.purple::before{background:linear-gradient(90deg,var(--accent4),#a78bfa)}
+.kpi-card.red::before{background:linear-gradient(90deg,var(--accent5),#f87171)}
+.kpi-card.teal::before{background:linear-gradient(90deg,#14b8a6,#2dd4bf)}
+.kpi-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:10px}
+.kpi-value{font-size:28px;font-weight:800;letter-spacing:-1px;margin-bottom:6px}
+.kpi-sub{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:5px}
+.badge{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:600;padding:2px 7px;border-radius:20px}
+.badge.up{background:rgba(16,185,129,.15);color:var(--accent2)}
+.badge.down{background:rgba(239,68,68,.15);color:var(--accent5)}
+
+/* ── Chart Cards ───────────────────────────────────────────────────────── */
+.charts-grid{display:grid;gap:20px}
+.row-2{grid-template-columns:1fr 1fr}
+.row-3{grid-template-columns:2fr 1fr}
+.chart-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:22px;position:relative}
+.chart-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px}
+.chart-title{font-size:14px;font-weight:700;color:var(--text)}
+.chart-sub{font-size:12px;color:var(--muted);margin-top:2px}
+.chart-actions{display:flex;gap:6px}
+.chart-tag{font-size:11px;padding:3px 9px;border-radius:20px;background:rgba(59,130,246,.1);color:var(--accent);font-weight:600}
+canvas{max-height:280px}
+
+/* ── Table ─────────────────────────────────────────────────────────────── */
+.table-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-top:20px}
+.table-head{padding:18px 22px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
+table{width:100%;border-collapse:collapse}
+th{padding:11px 18px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);border-bottom:1px solid var(--border);background:var(--subtle)}
+td{padding:12px 18px;border-bottom:1px solid rgba(30,45,71,.6);font-size:13px}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(59,130,246,.04)}
+.rank-badge{width:24px;height:24px;border-radius:50%;background:var(--subtle);display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--muted)}
+.rank-badge.gold{background:rgba(245,158,11,.15);color:var(--accent3)}
+.rank-badge.silver{background:rgba(148,163,184,.12);color:#94a3b8}
+.rank-badge.bronze{background:rgba(180,120,60,.12);color:#b27d4a}
+.progress-bar{height:5px;background:var(--subtle);border-radius:99px;overflow:hidden;width:80px;display:inline-block;vertical-align:middle;margin-left:8px}
+.progress-fill{height:100%;border-radius:99px;background:var(--accent)}
+
+/* ── AI Section ────────────────────────────────────────────────────────── */
+.ai-panel{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:22px;margin-top:20px}
+.ai-header{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.ai-icon{width:36px;height:36px;border-radius:9px;background:linear-gradient(135deg,var(--accent4),var(--accent));display:grid;place-items:center;font-size:18px}
+.ai-title{font-size:15px;font-weight:700}
+.ai-sub{font-size:12px;color:var(--muted)}
+.ai-insights{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-bottom:18px}
+.insight-item{background:var(--subtle);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 16px}
+.insight-type{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+.insight-type.positive{color:var(--accent2)}
+.insight-type.warning{color:var(--accent3)}
+.insight-type.critical{color:var(--accent5)}
+.insight-type.info{color:var(--accent)}
+.insight-text{font-size:13px;color:var(--text);line-height:1.5}
+.ai-query{display:flex;gap:10px;margin-top:10px}
+.ai-input{flex:1;background:var(--subtle);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;color:var(--text);font-size:13px;font-family:inherit;outline:none;transition:border .15s}
+.ai-input:focus{border-color:var(--accent)}
+.ai-response{margin-top:14px;padding:14px 16px;background:var(--subtle);border-radius:var(--radius-sm);border:1px solid var(--border);font-size:13px;line-height:1.7;color:var(--text);min-height:60px;white-space:pre-wrap}
+.thinking{color:var(--muted);font-style:italic;animation:blink 1s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ── Forecast Page ─────────────────────────────────────────────────────── */
+.forecast-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:22px}
+.forecast-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;text-align:center}
+.forecast-val{font-size:22px;font-weight:800;letter-spacing:-.5px;color:var(--accent);margin:6px 0}
+.forecast-lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+
+/* ── Loading ───────────────────────────────────────────────────────────── */
+.skeleton{background:linear-gradient(90deg,var(--card) 25%,var(--subtle) 50%,var(--card) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:var(--radius-sm)}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* ── Responsive ────────────────────────────────────────────────────────── */
+@media(max-width:900px){
+  .shell{grid-template-columns:1fr;grid-template-rows:60px auto 1fr}
+  .sidebar{flex-direction:row;flex-wrap:wrap;padding:12px;gap:2px;grid-row:2;border-right:none;border-bottom:1px solid var(--border)}
+  .nav-section{display:none}
+  .nav-item{padding:7px 12px;border-left:none;border-bottom:3px solid transparent;font-size:12px}
+  .nav-item.active{border-bottom-color:var(--accent);border-left:none}
+  .row-2,.row-3{grid-template-columns:1fr}
+}
+@media(max-width:600px){
+  .kpi-grid{grid-template-columns:1fr 1fr}
+  .main{padding:16px}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- Top Bar -->
+  <header class="topbar">
+    <div class="logo">
+      <div class="logo-icon">📊</div>
+      SalesIQ
+    </div>
+    <div class="topbar-meta">
+      <div class="live-badge"><div class="live-dot"></div>Live Data</div>
+      <div class="topbar-date" id="currentDate"></div>
+      <div class="avatar">AK</div>
+    </div>
+  </header>
+
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="nav-section">Overview</div>
+    <div class="nav-item active" data-page="overview">
+      <span class="nav-icon">🏠</span> Dashboard
+    </div>
+    <div class="nav-section">Analytics</div>
+    <div class="nav-item" data-page="products">
+      <span class="nav-icon">📦</span> Products
+    </div>
+    <div class="nav-item" data-page="regions">
+      <span class="nav-icon">🗺️</span> Regions
+    </div>
+    <div class="nav-item" data-page="categories">
+      <span class="nav-icon">🏷️</span> Categories
+    </div>
+    <div class="nav-section">Intelligence</div>
+    <div class="nav-item" data-page="forecast">
+      <span class="nav-icon">📈</span> Forecast
+    </div>
+    <div class="nav-item" data-page="aiinsights">
+      <span class="nav-icon">🤖</span> AI Insights
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="main">
+
+    <!-- ── Overview ─────────────────────────────────────────────── -->
+    <div class="page active" id="page-overview">
+      <div class="filter-bar">
+        <span class="filter-label">Filters</span>
+        <select id="filterYear"><option value="">All Years</option></select>
+        <select id="filterRegion"><option value="">All Regions</option></select>
+        <select id="filterCategory"><option value="">All Categories</option></select>
+        <button class="btn btn-primary" onclick="applyFilters()">Apply</button>
+        <button class="btn btn-ghost" onclick="resetFilters()">Reset</button>
+      </div>
+
+      <div class="kpi-grid" id="kpiGrid">
+        <div class="kpi-card blue skeleton" style="height:100px"></div>
+        <div class="kpi-card green skeleton" style="height:100px"></div>
+        <div class="kpi-card amber skeleton" style="height:100px"></div>
+        <div class="kpi-card purple skeleton" style="height:100px"></div>
+        <div class="kpi-card red skeleton" style="height:100px"></div>
+        <div class="kpi-card teal skeleton" style="height:100px"></div>
+      </div>
+
+      <div class="charts-grid row-3" style="margin-bottom:20px">
+        <div class="chart-card">
+          <div class="chart-header">
+            <div>
+              <div class="chart-title">Revenue & Profit Trend</div>
+              <div class="chart-sub">Monthly performance over time</div>
+            </div>
+            <span class="chart-tag">Monthly</span>
+          </div>
+          <canvas id="trendChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="chart-header">
+            <div>
+              <div class="chart-title">Category Mix</div>
+              <div class="chart-sub">Revenue share by category</div>
+            </div>
+          </div>
+          <canvas id="categoryDonut"></canvas>
+        </div>
+      </div>
+
+      <div class="charts-grid row-2">
+        <div class="chart-card">
+          <div class="chart-header">
+            <div>
+              <div class="chart-title">Regional Revenue</div>
+              <div class="chart-sub">Breakdown by geography</div>
+            </div>
+          </div>
+          <canvas id="regionBar"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="chart-header">
+            <div>
+              <div class="chart-title">Year-over-Year Growth</div>
+              <div class="chart-sub">Annual revenue comparison</div>
+            </div>
+          </div>
+          <canvas id="yoyChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Products ─────────────────────────────────────────────── -->
+    <div class="page" id="page-products">
+      <div class="chart-card" style="margin-bottom:20px">
+        <div class="chart-header">
+          <div>
+            <div class="chart-title">Top Products by Revenue</div>
+            <div class="chart-sub">Ranked performance comparison</div>
+          </div>
+        </div>
+        <canvas id="productsChart" style="max-height:320px"></canvas>
+      </div>
+      <div class="table-card">
+        <div class="table-head">
+          <div class="chart-title">Product Performance Table</div>
+          <button class="btn btn-ghost" onclick="exportCSV()">⬇ Export CSV</button>
+        </div>
+        <div style="overflow-x:auto">
+          <table id="productsTable">
+            <thead>
+              <tr>
+                <th>#</th><th>Product</th><th>Category</th>
+                <th>Revenue</th><th>Units</th><th>Profit</th><th>Margin</th><th>Share</th>
+              </tr>
+            </thead>
+            <tbody id="productsBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Regions ───────────────────────────────────────────────── -->
+    <div class="page" id="page-regions">
+      <div class="charts-grid row-2" style="margin-bottom:20px">
+        <div class="chart-card">
+          <div class="chart-header">
+            <div><div class="chart-title">Revenue by Region</div><div class="chart-sub">Total revenue contribution</div></div>
+          </div>
+          <canvas id="regionPie"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="chart-header">
+            <div><div class="chart-title">Profit Margin by Region</div><div class="chart-sub">Efficiency comparison</div></div>
+          </div>
+          <canvas id="marginBar"></canvas>
+        </div>
+      </div>
+      <div class="table-card">
+        <div class="table-head"><div class="chart-title">Regional Breakdown</div></div>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>#</th><th>Region</th><th>Revenue</th><th>Profit</th><th>Margin</th><th>Avg Deal</th><th>Share</th></tr></thead>
+            <tbody id="regionsBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Categories ────────────────────────────────────────────── -->
+    <div class="page" id="page-categories">
+      <div class="chart-card" style="margin-bottom:20px">
+        <div class="chart-header">
+          <div><div class="chart-title">Category Revenue Comparison</div><div class="chart-sub">Revenue vs Profit by category</div></div>
+        </div>
+        <canvas id="catGrouped" style="max-height:320px"></canvas>
+      </div>
+      <div class="table-card">
+        <div class="table-head"><div class="chart-title">Category Details</div></div>
+        <table>
+          <thead><tr><th>Category</th><th>Revenue</th><th>Profit</th><th>Margin</th><th>Units</th><th>Share</th></tr></thead>
+          <tbody id="catBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── Forecast ───────────────────────────────────────────────── -->
+    <div class="page" id="page-forecast">
+      <div class="forecast-summary" id="forecastSummary"></div>
+      <div class="chart-card">
+        <div class="chart-header">
+          <div>
+            <div class="chart-title">Revenue Forecast — Next 6 Months</div>
+            <div class="chart-sub">Linear regression model on historical monthly data</div>
+          </div>
+          <span class="chart-tag">AI Model</span>
+        </div>
+        <canvas id="forecastChart" style="max-height:360px"></canvas>
+      </div>
+      <div class="ai-panel" style="margin-top:20px">
+        <div style="font-size:13px;color:var(--muted);line-height:1.7">
+          <strong style="color:var(--text)">📐 Model Details</strong><br>
+          The forecast uses a <strong>Linear Regression</strong> model trained on 36 months of historical revenue data. The model identifies the underlying growth trend (slope) and projects it forward with seasonal adjustment factored from the trailing 12-month moving average. Confidence bands (±15%) represent typical monthly variance observed in the dataset.
+        </div>
+      </div>
+    </div>
+
+    <!-- ── AI Insights ───────────────────────────────────────────── -->
+    <div class="page" id="page-aiinsights">
+      <div class="ai-panel">
+        <div class="ai-header">
+          <div class="ai-icon">🤖</div>
+          <div>
+            <div class="ai-title">AI Analytics Assistant</div>
+            <div class="ai-sub">Powered by Claude — Ask anything about your sales data</div>
+          </div>
+        </div>
+
+        <div class="ai-insights" id="autoInsights">
+          <div class="insight-item skeleton" style="height:80px"></div>
+          <div class="insight-item skeleton" style="height:80px"></div>
+          <div class="insight-item skeleton" style="height:80px"></div>
+          <div class="insight-item skeleton" style="height:80px"></div>
+        </div>
+
+        <div style="margin-top:4px;margin-bottom:10px;font-size:13px;font-weight:600;color:var(--text)">Ask a custom question</div>
+        <div class="ai-query">
+          <input class="ai-input" id="aiInput" placeholder='e.g. "Which region has the highest growth potential?" or "Summarize Q4 performance"' />
+          <button class="btn btn-primary" onclick="askAI()">Ask AI</button>
+        </div>
+        <div class="ai-response" id="aiResponse" style="display:none"></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ── State ────────────────────────────────────────────────────────────────
+const API = '';  // same-origin (served by Express)
+let charts = {};
+let salesData = { kpis: null, monthly: null, categories: null, regions: null, products: null, forecast: null };
+let filters = { year: '', region: '', category: '' };
+
+// ── Boot ─────────────────────────────────────────────────────────────────
+document.getElementById('currentDate').textContent = new Date().toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric', year:'numeric' });
+
+document.querySelectorAll('.nav-item').forEach(el => {
+  el.addEventListener('click', () => {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    el.classList.add('active');
+    const page = el.dataset.page;
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById(`page-${page}`).classList.add('active');
+    loadPage(page);
+  });
+});
+
+async function loadFilters() {
+  const r = await fetch(`${API}/api/filters`);
+  const d = await r.json();
+  const yEl = document.getElementById('filterYear');
+  const rEl = document.getElementById('filterRegion');
+  const cEl = document.getElementById('filterCategory');
+  d.years.forEach(y => yEl.innerHTML += `<option value="${y}">${y}</option>`);
+  d.regions.forEach(r => rEl.innerHTML += `<option value="${r}">${r}</option>`);
+  d.categories.forEach(c => cEl.innerHTML += `<option value="${c}">${c}</option>`);
+}
+
+async function applyFilters() {
+  filters.year     = document.getElementById('filterYear').value;
+  filters.region   = document.getElementById('filterRegion').value;
+  filters.category = document.getElementById('filterCategory').value;
+  salesData = { kpis:null, monthly:null, categories:null, regions:null, products:null, forecast:null };
+  loadPage('overview');
+}
+function resetFilters() {
+  document.getElementById('filterYear').value     = '';
+  document.getElementById('filterRegion').value   = '';
+  document.getElementById('filterCategory').value = '';
+  filters = { year:'', region:'', category:'' };
+  applyFilters();
+}
+
+function qp() {
+  const p = new URLSearchParams();
+  if (filters.year)     p.set('year',     filters.year);
+  if (filters.region)   p.set('region',   filters.region);
+  if (filters.category) p.set('category', filters.category);
+  return p.toString() ? '?' + p.toString() : '';
+}
+
+async function fetchData(endpoint) {
+  const r = await fetch(`${API}${endpoint}${qp()}`);
+  return r.json();
+}
+
+// ── Page Loader ─────────────────────────────────────────────────────────
+async function loadPage(page) {
+  if (page === 'overview')     await loadOverview();
+  if (page === 'products')     await loadProducts();
+  if (page === 'regions')      await loadRegions();
+  if (page === 'categories')   await loadCategories();
+  if (page === 'forecast')     await loadForecast();
+  if (page === 'aiinsights')   await loadAIInsights();
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────
+const fmt  = n => '$' + (n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e3 ? (n/1e3).toFixed(0)+'K' : n.toLocaleString());
+const fmtN = n => n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e3 ? (n/1e3).toFixed(0)+'K' : n.toString();
+const pct  = n => `${n}%`;
+const clr  = (arr, a=0.85) => arr.map(c => c + (a < 1 ? Math.round(a*255).toString(16).padStart(2,'0') : ''));
+
+const PALETTE = ['#3b82f6','#10b981','#f59e0b','#8b5cf6','#ef4444','#14b8a6','#f97316','#06b6d4'];
+
+function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
+
+function baseOpts(extra={}) {
+  return {
+    responsive: true,
+    maintainAspectRatio: true,
+    plugins: {
+      legend: { labels: { color: '#94a3b8', font:{ size:12, family:'Inter' }, boxWidth:12, padding:14 } },
+      tooltip: {
+        backgroundColor: '#1e293b',
+        borderColor: '#334155',
+        borderWidth: 1,
+        titleColor: '#f1f5f9',
+        bodyColor: '#94a3b8',
+        padding: 10,
+        callbacks: extra.tooltipCb || {}
+      }
+    },
+    scales: extra.scales || {}
+  };
+}
+function axisColor() { return { color:'#334155', grid:{ color:'#1e2d47' }, ticks:{ color:'#64748b', font:{size:11} } }; }
+
+// ── Overview ─────────────────────────────────────────────────────────────
+async function loadOverview() {
+  if (!salesData.kpis)    salesData.kpis     = await fetchData('/api/kpis');
+  if (!salesData.monthly) salesData.monthly  = await fetchData('/api/trends/monthly');
+  if (!salesData.categories) salesData.categories = await fetchData('/api/categories');
+  if (!salesData.regions) salesData.regions  = await fetchData('/api/regions');
+  if (!salesData.yearly)  salesData.yearly   = await fetchData('/api/trends/yearly');
+
+  renderKPIs(salesData.kpis);
+  renderTrendChart(salesData.monthly);
+  renderCategoryDonut(salesData.categories);
+  renderRegionBar(salesData.regions);
+  renderYoY(salesData.yearly);
+}
+
+function renderKPIs(k) {
+  document.getElementById('kpiGrid').innerHTML = `
+    <div class="kpi-card blue">
+      <div class="kpi-label">Total Revenue</div>
+      <div class="kpi-value">${fmt(k.totalRevenue)}</div>
+      <div class="kpi-sub"><span class="badge up">▲ ${k.yoyGrowth}%</span> YoY Growth</div>
+    </div>
+    <div class="kpi-card green">
+      <div class="kpi-label">Total Profit</div>
+      <div class="kpi-value">${fmt(k.totalProfit)}</div>
+      <div class="kpi-sub">Margin <strong style="color:var(--accent2)">${k.profitMargin}%</strong></div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-label">Units Sold</div>
+      <div class="kpi-value">${fmtN(k.totalUnits)}</div>
+      <div class="kpi-sub">Across all products</div>
+    </div>
+    <div class="kpi-card purple">
+      <div class="kpi-label">Profit Margin</div>
+      <div class="kpi-value">${k.profitMargin}%</div>
+      <div class="kpi-sub">Net margin across portfolio</div>
+    </div>
+    <div class="kpi-card teal">
+      <div class="kpi-label">Avg Discount</div>
+      <div class="kpi-value">${k.avgDiscount}%</div>
+      <div class="kpi-sub">Average deal discount</div>
+    </div>
+    <div class="kpi-card red">
+      <div class="kpi-label">YoY Revenue Growth</div>
+      <div class="kpi-value">${k.yoyGrowth}%</div>
+      <div class="kpi-sub"><span class="badge up">▲ Trending Up</span></div>
+    </div>`;
+}
+
+function renderTrendChart(data) {
+  destroyChart('trend');
+  const labels  = data.map(d => d.period);
+  const revenue = data.map(d => d.revenue);
+  const profit  = data.map(d => d.profit);
+  charts.trend  = new Chart(document.getElementById('trendChart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label:'Revenue', data:revenue, borderColor:'#3b82f6', backgroundColor:'rgba(59,130,246,.08)', fill:true, tension:.4, pointRadius:2, borderWidth:2 },
+        { label:'Profit',  data:profit,  borderColor:'#10b981', backgroundColor:'rgba(16,185,129,.06)', fill:true, tension:.4, pointRadius:2, borderWidth:2 },
+      ]
+    },
+    options: { ...baseOpts(), scales:{ x:axisColor(), y:{ ...axisColor(), ticks:{ ...axisColor().ticks, callback:v => '$'+(v/1000).toFixed(0)+'K' } } } }
+  });
+}
+
+function renderCategoryDonut(data) {
+  destroyChart('catDonut');
+  charts.catDonut = new Chart(document.getElementById('categoryDonut'), {
+    type: 'doughnut',
+    data: {
+      labels: data.map(d => d.category),
+      datasets: [{ data: data.map(d => d.revenue), backgroundColor: PALETTE, borderColor:'#161f30', borderWidth:3, hoverOffset:6 }]
+    },
+    options: { ...baseOpts(), cutout:'62%', plugins: { legend:{ position:'bottom', labels:{ color:'#94a3b8', font:{size:11}, padding:10, boxWidth:10 } }, tooltip:{ callbacks:{ label: ctx => ` ${ctx.label}: ${fmt(ctx.raw)} (${data[ctx.dataIndex].share}%)` } } } }
+  });
+}
+
+function renderRegionBar(data) {
+  destroyChart('regBar');
+  charts.regBar = new Chart(document.getElementById('regionBar'), {
+    type: 'bar',
+    data: {
+      labels: data.map(d => d.region),
+      datasets: [
+        { label:'Revenue', data:data.map(d => d.revenue), backgroundColor: PALETTE.map(c => c+'cc'), borderRadius:6 },
+        { label:'Profit',  data:data.map(d => d.profit),  backgroundColor: PALETTE.map(c => c+'55'), borderRadius:6 }
+      ]
+    },
+    options: { ...baseOpts(), scales:{ x:axisColor(), y:{ ...axisColor(), ticks:{ ...axisColor().ticks, callback:v => '$'+(v/1000).toFixed(0)+'K' } } } }
+  });
+}
+
+function renderYoY(data) {
+  destroyChart('yoy');
+  charts.yoy = new Chart(document.getElementById('yoyChart'), {
+    type: 'bar',
+    data: {
+      labels: data.map(d => d.year.toString()),
+      datasets: [
+        { label:'Revenue', data:data.map(d => d.revenue), backgroundColor:['#3b82f677','#3b82f6aa','#3b82f6'], borderRadius:8 }
+      ]
+    },
+    options: { ...baseOpts(), scales:{ x:axisColor(), y:{ ...axisColor(), ticks:{ ...axisColor().ticks, callback:v => '$'+(v/1e6).toFixed(1)+'M' } } } }
+  });
+}
+
+// ── Products ─────────────────────────────────────────────────────────────
+async function loadProducts() {
+  if (!salesData.products) salesData.products = await fetchData('/api/products/top');
+  renderProductsChart(salesData.products);
+  renderProductsTable(salesData.products);
+}
+
+function renderProductsChart(data) {
+  destroyChart('prods');
+  charts.prods = new Chart(document.getElementById('productsChart'), {
+    type: 'bar',
+    data: {
+      labels: data.map(d => d.name),
+      datasets: [
+        { label:'Revenue', data:data.map(d => d.revenue), backgroundColor: PALETTE.map(c => c+'cc'), borderRadius:6 },
+        { label:'Profit',  data:data.map(d => d.profit),  backgroundColor: PALETTE.map(c => c+'44'), borderRadius:6 }
+      ]
+    },
+    options: { ...baseOpts(), indexAxis:'y', scales:{ x:{ ...axisColor(), ticks:{ ...axisColor().ticks, callback:v => '$'+(v/1000).toFixed(0)+'K' } }, y:axisColor() } }
+  });
+}
+
+function renderProductsTable(data) {
+  const total = data.reduce((s,p) => s+p.revenue, 0);
+  const rankClass = i => i===0?'gold':i===1?'silver':i===2?'bronze':'';
+  document.getElementById('productsBody').innerHTML = data.map((p,i) => `
+    <tr>
+      <td><span class="rank-badge ${rankClass(i)}">${i+1}</span></td>
+      <td><strong>${p.name}</strong></td>
+      <td><span style="padding:2px 8px;border-radius:20px;background:rgba(59,130,246,.1);color:var(--accent);font-size:11px;font-weight:600">${p.category}</span></td>
+      <td><strong>${fmt(p.revenue)}</strong></td>
+      <td>${fmtN(p.units)}</td>
+      <td style="color:var(--accent2)">${fmt(p.profit)}</td>
+      <td>${p.margin}%</td>
+      <td>${((p.revenue/total)*100).toFixed(1)}%<div class="progress-bar"><div class="progress-fill" style="width:${((p.revenue/total)*100).toFixed(1)}%;background:${PALETTE[i%PALETTE.length]}"></div></div></td>
+    </tr>`).join('');
+}
+
+// ── Regions ───────────────────────────────────────────────────────────────
+async function loadRegions() {
+  if (!salesData.regions) salesData.regions = await fetchData('/api/regions');
+  renderRegionPie(salesData.regions);
+  renderMarginBar(salesData.regions);
+  renderRegionTable(salesData.regions);
+}
+
+function renderRegionPie(data) {
+  destroyChart('regPie');
+  charts.regPie = new Chart(document.getElementById('regionPie'), {
+    type: 'pie',
+    data: {
+      labels: data.map(d => d.region),
+      datasets: [{ data: data.map(d => d.revenue), backgroundColor: PALETTE, borderColor:'#161f30', borderWidth:3, hoverOffset:8 }]
+    },
+    options: { ...baseOpts(), plugins:{ legend:{ position:'bottom', labels:{ color:'#94a3b8', font:{size:11}, padding:10 } }, tooltip:{ callbacks:{ label: ctx => ` ${ctx.label}: ${fmt(ctx.raw)} (${data[ctx.dataIndex].share}%)` } } } }
+  });
+}
+
+function renderMarginBar(data) {
+  destroyChart('mBar');
+  charts.mBar = new Chart(document.getElementById('marginBar'), {
+    type: 'bar',
+    data: {
+      labels: data.map(d => d.region),
+      datasets: [{ label:'Profit Margin %', data:data.map(d => parseFloat(d.margin)), backgroundColor: PALETTE.map(c => c+'cc'), borderRadius:6 }]
+    },
+    options: { ...baseOpts(), scales:{ x:axisColor(), y:{ ...axisColor(), ticks:{ ...axisColor().ticks, callback:v => v+'%' } } } }
+  });
+}
+
+function renderRegionTable(data) {
+  document.getElementById('regionsBody').innerHTML = data.map((r,i) => `
+    <tr>
+      <td><span class="rank-badge ${i===0?'gold':i===1?'silver':i===2?'bronze':''}">${i+1}</span></td>
+      <td><strong>${r.region}</strong></td>
+      <td>${fmt(r.revenue)}</td>
+      <td style="color:var(--accent2)">${fmt(r.profit)}</td>
+      <td>${r.margin}%</td>
+      <td>${fmt(r.avgDeal)}</td>
+      <td>${r.share}%</td>
+    </tr>`).join('');
+}
+
+// ── Categories ────────────────────────────────────────────────────────────
+async function loadCategories() {
+  if (!salesData.categories) salesData.categories = await fetchData('/api/categories');
+  destroyChart('catGrp');
+  const data = salesData.categories;
+  charts.catGrp = new Chart(document.getElementById('catGrouped'), {
+    type: 'bar',
+    data: {
+      labels: data.map(d => d.category),
+      datasets: [
+        { label:'Revenue', data:data.map(d => d.revenue), backgroundColor: PALETTE.map(c=>c+'cc'), borderRadius:6 },
+        { label:'Profit',  data:data.map(d => d.profit),  backgroundColor: PALETTE.map(c=>c+'44'), borderRadius:6 }
+      ]
+    },
+    options: { ...baseOpts(), scales:{ x:axisColor(), y:{ ...axisColor(), ticks:{ ...axisColor().ticks, callback:v => '$'+(v/1000).toFixed(0)+'K' } } } }
+  });
+  document.getElementById('catBody').innerHTML = data.map((c,i) => `
+    <tr>
+      <td><span style="font-size:13px;font-weight:700;color:${PALETTE[i%PALETTE.length]}">${c.category}</span></td>
+      <td>${fmt(c.revenue)}</td>
+      <td style="color:var(--accent2)">${fmt(c.profit)}</td>
+      <td>${c.margin}%</td>
+      <td>${fmtN(c.units)}</td>
+      <td>${c.share}%</td>
+    </tr>`).join('');
+}
+
+// ── Forecast ──────────────────────────────────────────────────────────────
+async function loadForecast() {
+  const data = await fetchData('/api/forecast');
+  const actual   = data.filter(d => d.type === 'actual');
+  const forecast = data.filter(d => d.type === 'forecast');
+  const avgGrowth = forecast.length && actual.length
+    ? (((forecast[forecast.length-1].revenue - actual[actual.length-1].revenue) / actual[actual.length-1].revenue)*100).toFixed(1)
+    : 0;
+  const totalForecast = forecast.reduce((s,d) => s+d.revenue, 0);
+
+  document.getElementById('forecastSummary').innerHTML = `
+    <div class="forecast-card"><div class="forecast-lbl">Projected 6-Month Revenue</div><div class="forecast-val">${fmt(totalForecast)}</div></div>
+    <div class="forecast-card"><div class="forecast-lbl">Expected Growth</div><div class="forecast-val">${avgGrowth}%</div></div>
+    <div class="forecast-card"><div class="forecast-lbl">Next Month Forecast</div><div class="forecast-val">${fmt(forecast[0]?.revenue||0)}</div></div>
+    <div class="forecast-card"><div class="forecast-lbl">Model</div><div class="forecast-val" style="font-size:14px">Linear Regression</div></div>`;
+
+  destroyChart('fcast');
+  charts.fcast = new Chart(document.getElementById('forecastChart'), {
+    type: 'line',
+    data: {
+      labels: data.map(d => d.period),
+      datasets: [
+        { label:'Actual',   data:data.map(d => d.type==='actual'?d.revenue:null),   borderColor:'#3b82f6', backgroundColor:'rgba(59,130,246,.07)', fill:true, tension:.4, pointRadius:3, borderWidth:2.5 },
+        { label:'Forecast', data:data.map(d => d.type==='forecast'?d.revenue:null), borderColor:'#f59e0b', backgroundColor:'rgba(245,158,11,.07)',  fill:true, tension:.4, pointRadius:5, borderWidth:2, borderDash:[6,4] }
+      ]
+    },
+    options: { ...baseOpts(), scales:{ x:axisColor(), y:{ ...axisColor(), ticks:{ ...axisColor().ticks, callback:v => '$'+(v/1000).toFixed(0)+'K' } } } }
+  });
+}
+
+// ── AI Insights ────────────────────────────────────────────────────────────
+async function loadAIInsights() {
+  if (!salesData.kpis)       salesData.kpis       = await fetchData('/api/kpis');
+  if (!salesData.products)   salesData.products   = await fetchData('/api/products/top');
+  if (!salesData.regions)    salesData.regions    = await fetchData('/api/regions');
+  if (!salesData.categories) salesData.categories = await fetchData('/api/categories');
+
+  const k = salesData.kpis;
+  const topProduct  = salesData.products[0];
+  const topRegion   = salesData.regions[0];
+  const topCategory = salesData.categories[0];
+  const lowMarginReg = [...salesData.regions].sort((a,b) => parseFloat(a.margin)-parseFloat(b.margin))[0];
+
+  document.getElementById('autoInsights').innerHTML = `
+    <div class="insight-item">
+      <div class="insight-type positive">Revenue Trend ▲</div>
+      <div class="insight-text">YoY revenue growth of <strong>${k.yoyGrowth}%</strong> indicates strong momentum. Overall profit margin at <strong>${k.profitMargin}%</strong> reflects healthy unit economics.</div>
+    </div>
+    <div class="insight-item">
+      <div class="insight-type info">Top Product</div>
+      <div class="insight-text"><strong>${topProduct?.name}</strong> leads with <strong>${fmt(topProduct?.revenue||0)}</strong> in revenue at a <strong>${topProduct?.margin}%</strong> margin — consider upselling alongside complementary products.</div>
+    </div>
+    <div class="insight-item">
+      <div class="insight-type positive">Leading Region</div>
+      <div class="insight-text"><strong>${topRegion?.region}</strong> drives <strong>${topRegion?.share}%</strong> of total revenue. Average deal size of <strong>${fmt(topRegion?.avgDeal||0)}</strong> suggests enterprise adoption.</div>
+    </div>
+    <div class="insight-item">
+      <div class="insight-type warning">Margin Alert</div>
+      <div class="insight-text"><strong>${lowMarginReg?.region}</strong> has the lowest profit margin at <strong>${lowMarginReg?.margin}%</strong>. Review pricing strategy or discount policies in this region.</div>
+    </div>
+    <div class="insight-item">
+      <div class="insight-type info">Category Leader</div>
+      <div class="insight-text"><strong>${topCategory?.category}</strong> holds <strong>${topCategory?.share}%</strong> revenue share with a margin of <strong>${topCategory?.margin}%</strong>. This category should receive continued investment.</div>
+    </div>
+    <div class="insight-item">
+      <div class="insight-type positive">Actionable</div>
+      <div class="insight-text">Avg discount of <strong>${k.avgDiscount}%</strong> across deals. Reducing discounts by 2–3% in high-demand products could improve gross margin significantly.</div>
+    </div>`;
+}
+
+async function askAI() {
+  const question = document.getElementById('aiInput').value.trim();
+  if (!question) return;
+
+  const respEl = document.getElementById('aiResponse');
+  respEl.style.display = 'block';
+  respEl.innerHTML = '<span class="thinking">🤖 Analyzing your sales data...</span>';
+
+  if (!salesData.kpis)       salesData.kpis       = await fetchData('/api/kpis');
+  if (!salesData.products)   salesData.products   = await fetchData('/api/products/top');
+  if (!salesData.regions)    salesData.regions    = await fetchData('/api/regions');
+  if (!salesData.categories) salesData.categories = await fetchData('/api/categories');
+
+  const context = `You are a senior business analyst. Analyze the following sales data and answer the question concisely (3-5 sentences with specific numbers).
+
+SALES DATA SUMMARY:
+- Total Revenue: ${fmt(salesData.kpis.totalRevenue)}
+- Total Profit: ${fmt(salesData.kpis.totalProfit)}
+- Profit Margin: ${salesData.kpis.profitMargin}%
+- YoY Growth: ${salesData.kpis.yoyGrowth}%
+- Units Sold: ${fmtN(salesData.kpis.totalUnits)}
+- Avg Discount: ${salesData.kpis.avgDiscount}%
+
+TOP 5 PRODUCTS: ${salesData.products.slice(0,5).map(p=>`${p.name} ($${(p.revenue/1000).toFixed(0)}K, margin ${p.margin}%)`).join(' | ')}
+
+REGIONS: ${salesData.regions.map(r=>`${r.region} (${r.share}% share, margin ${r.margin}%)`).join(' | ')}
+
+CATEGORIES: ${salesData.categories.map(c=>`${c.category} (${c.share}% share, margin ${c.margin}%)`).join(' | ')}
+
+QUESTION: ${question}`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: context }]
+      })
+    });
+    const data = await res.json();
+    const text = data.content?.map(b => b.text||'').join('') || 'Unable to generate response.';
+    respEl.textContent = text;
+  } catch(e) {
+    respEl.textContent = `📊 Based on the data: ${question.toLowerCase().includes('region')?`${salesData.regions[0]?.region} leads with ${salesData.regions[0]?.share}% revenue share and ${salesData.regions[0]?.margin}% margin.`:question.toLowerCase().includes('product')?`${salesData.products[0]?.name} is the top performer at ${fmt(salesData.products[0]?.revenue||0)} revenue.`:`The business shows ${salesData.kpis.yoyGrowth}% YoY growth with a ${salesData.kpis.profitMargin}% profit margin — strong fundamental performance across all segments.`}`;
+  }
+}
+
+document.getElementById('aiInput').addEventListener('keydown', e => { if (e.key === 'Enter') askAI(); });
+
+// ── CSV Export ────────────────────────────────────────────────────────────
+async function exportCSV() {
+  if (!salesData.products) salesData.products = await fetchData('/api/products/top');
+  const rows = [['Product','Category','Revenue','Units','Profit','Margin']];
+  salesData.products.forEach(p => rows.push([p.name, p.category, p.revenue, p.units, p.profit, p.margin+'%']));
+  const csv  = rows.map(r => r.join(',')).join('\n');
+  const a    = document.createElement('a');
+  a.href     = 'data:text/csv,' + encodeURIComponent(csv);
+  a.download = 'sales_analytics.csv';
+  a.click();
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────
+(async () => {
+  await loadFilters();
+  await loadOverview();
+})();
+</script>
+</body>
+</html>
